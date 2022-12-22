@@ -1,0 +1,65 @@
+﻿@page "/fetchdata"
+@using BlazorAppTest.Data
+@using System.Diagnostics;
+@using Microsoft.AspNetCore.Components.Server;
+
+@inject WeatherForecastService ForecastService
+
+<PageTitle>Weather forecast</PageTitle>
+
+<h1>Weather forecast</h1>
+
+<AuthorizeView>
+    <span></span>
+</AuthorizeView>
+<p>This component demonstrates fetching data from a service.</p>
+
+
+@code {
+
+
+    [Inject] private CustomAuthProvider authproviderBlazorInjected { get; set; }
+    [Inject] private AuthenticationStateProvider authproviderBlazorInjectedBase { get; set; }
+    [Inject] private IServiceProvider _sp { get; set; }
+    [CascadingParameter]
+    private Task<AuthenticationState> cascadingAuthStateTask { get; set; }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            //with the following DI registration:
+            //builder.Services.AddRazorPages();
+            //builder.Services.AddServerSideBlazor();
+            //builder.Services.AddScoped<CustomAuthProvider>();
+            //builder.Services.AddScoped<AuthenticationStateProvider, CustomAuthProvider>(p => p.GetRequiredService<CustomAuthProvider>());
+
+            var authproviderResolvedFromInjectedSpExistingScope = _sp.GetRequiredService<AuthenticationStateProvider>();
+
+            //Assert expected equality
+            Debug.Assert(authproviderResolvedFromInjectedSpExistingScope == authproviderBlazorInjected, "Resolved auth provider mismatch 1", ""); //OK
+            Debug.Assert(authproviderBlazorInjectedBase == authproviderBlazorInjected, "Resolved auth provider mismatch 2", ""); //OK
+            Debug.Assert(authproviderResolvedFromInjectedSpExistingScope == authproviderBlazorInjectedBase, "Resolved auth provider mismatch 3", ""); //OK
+            var authproviderFromNewScope = _sp.CreateScope().ServiceProvider.GetRequiredService<CustomAuthProvider>();
+            Debug.Assert(authproviderFromNewScope != authproviderBlazorInjectedBase);
+
+
+            //Assert unwrapped authentication state task equality with static 'CustomAuthProvider.Guest'
+
+            Debug.Assert(await cascadingAuthStateTask == CustomAuthProvider.GuestAuthenticationState, "auth state task mismatch 1", ""); //Assertion fails.
+            Debug.Assert(await cascadingAuthStateTask == await authproviderResolvedFromInjectedSpExistingScope.GetAuthenticationStateAsync(), "auth state task mismatch 2", ""); //OK
+            Debug.Assert(await cascadingAuthStateTask == await authproviderBlazorInjected.GetAuthenticationStateAsync(), "auth state task mismatch 3", ""); //OK
+            Debug.Assert(await cascadingAuthStateTask == await authproviderBlazorInjectedBase.GetAuthenticationStateAsync(), "auth state task mismatch 4", ""); //OK
+
+
+            Debug.Assert(await cascadingAuthStateTask == await authproviderFromNewScope.GetAuthenticationStateAsync(), "auth state task mismatch 5", ""); //Assertion fails.
+
+
+            //Asset various auth provider's `GetAuthenticationStateAsync` equality with  static 'CustomAuthProvider.Guest'
+
+            Debug.Assert(await authproviderFromNewScope.GetAuthenticationStateAsync() == CustomAuthProvider.GuestAuthenticationState, "auth state task mismatch 6", ""); //OK
+            Debug.Assert(await authproviderBlazorInjected.GetAuthenticationStateAsync() == CustomAuthProvider.GuestAuthenticationState, "auth state task mismatch 7", ""); //Assertion fails
+            Debug.Assert(await authproviderBlazorInjectedBase.GetAuthenticationStateAsync() == CustomAuthProvider.GuestAuthenticationState, "auth state task mismatch 8", ""); //Assertion fails
+        }
+    }
+}
